@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <mutex>
 #include <vector>
+#include <iostream>
 
 static std::vector<ProcessInfo> background_processes;
 static std::mutex mtx_background;
@@ -22,11 +23,15 @@ size_t get_background_process_count() {
 // Hàm tiện ích đóng Handle của một ProcessInfo
 static void close_handles(ProcessInfo& p) {
   if (p.hProcess) {
-    CloseHandle(p.hProcess);
+    if (!CloseHandle(p.hProcess)) {
+      std::cerr << "Warning: Failed to close process handle.\n";
+    }
     p.hProcess = NULL;
   }
   if (p.hJob) {
-    CloseHandle(p.hJob);
+    if (!CloseHandle(p.hJob)) {
+      std::cerr << "Warning: Failed to close job handle.\n";
+    }
     p.hJob = NULL;
   }
 }
@@ -69,7 +74,9 @@ std::vector<FinishedProcess> remove_finished_processes() {
     }
     if (wr == WAIT_OBJECT_0) {
       DWORD code = 0;
-      GetExitCodeProcess(it->hProcess, &code);
+      if (!GetExitCodeProcess(it->hProcess, &code)) {
+        std::cerr << "Warning: Failed to get exit code.\n";
+      }
       finished.push_back({it->pid, code});
     }
     close_handles(*it);

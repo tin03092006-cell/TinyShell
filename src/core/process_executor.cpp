@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include "process_manager.h"
 #include <mutex>
@@ -24,9 +25,13 @@ static HANDLE create_and_assign_job(HANDLE hProcess, bool is_background) {
     if (is_background) {
       JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli{};
       jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-      SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli));
+      if (!SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli))) {
+        std::cerr << "Warning: Failed to set job object information. Error: " << GetLastError() << "\n";
+      }
     }
-    AssignProcessToJobObject(hJob, hProcess);
+    if (!AssignProcessToJobObject(hJob, hProcess)) {
+      std::cerr << "Warning: Failed to assign process to job object. Error: " << GetLastError() << "\n";
+    }
   }
   return hJob;
 }
@@ -37,7 +42,9 @@ static void wait_foreground_process(HANDLE hProcess, HANDLE hJob) {
     std::lock_guard<std::mutex> lock(mtx_foreground);
     current_foreground_process = hProcess;
   }
-  WaitForSingleObject(hProcess, INFINITE);
+  if (WaitForSingleObject(hProcess, INFINITE) == WAIT_FAILED) {
+    std::cerr << "Error: Failed to wait for foreground process. Error: " << GetLastError() << "\n";
+  }
   {
     std::lock_guard<std::mutex> lock(mtx_foreground);
     current_foreground_process = NULL;
@@ -67,16 +74,24 @@ ExecutionResult execute_external(std::vector<std::string>& args, bool is_backgro
   HANDLE hJob = create_and_assign_job(pi.hProcess, is_background);
 
   // Bây giờ process đã ở trong Job Object, ta mới resume cho nó chạy
-  ResumeThread(pi.hThread);
-  CloseHandle(pi.hThread);
+  if (ResumeThread(pi.hThread) == (DWORD)-1) {
+    std::cerr << "Warning: Failed to resume thread.\n";
+  }
+  if (!CloseHandle(pi.hThread)) {
+    std::cerr << "Warning: Failed to close thread handle.\n";
+  }
 
   if (is_background) {
     add_background_process({pi.dwProcessId, cmd_line, pi.hProcess, hJob, true, false});
     return {true, pi.dwProcessId};
   } else {
     wait_foreground_process(pi.hProcess, hJob);
-    if (hJob) CloseHandle(hJob);
-    CloseHandle(pi.hProcess);
+    if (hJob) {
+      if (!CloseHandle(hJob)) std::cerr << "Warning: Failed to close job handle.\n";
+    }
+    if (!CloseHandle(pi.hProcess)) {
+      std::cerr << "Warning: Failed to close process handle.\n";
+    }
     return {true, 0};
   }
 }

@@ -106,7 +106,9 @@ void execute_dir(const std::vector<std::string>& args) {
         std::cout << filename << "\n";
       }
     } while (FindNextFileA(hFind, &findData));
-    FindClose(hFind);
+    if (!FindClose(hFind)) {
+      std::cerr << "Warning: Failed to close find handle.\n";
+    }
   } else {
     std::cout << "Error: File not found.\n";
   }
@@ -150,8 +152,11 @@ void execute_addpath(const std::string& newPath) {
         << "Error: PATH would exceed maximum length (32767 characters).\n";
     return;
   }
-  SetEnvironmentVariableA("PATH", updatedPath.c_str());
-  std::cout << "PATH updated.\n";
+  if (!SetEnvironmentVariableA("PATH", updatedPath.c_str())) {
+    std::cout << "Error: Failed to update PATH. Error: " << GetLastError() << "\n";
+  } else {
+    std::cout << "PATH updated.\n";
+  }
 }
 
 // --- PROCESS MANAGEMENT COMMANDS ---

@@ -52,21 +52,28 @@ std::string join_args(const std::vector<std::string>& args, size_t start) {
   return result;
 }
 
+// Hàm phụ trợ: Escape một tham số dòng lệnh
+static std::string escape_argument(const std::string& arg) {
+  if (arg.empty() || arg.find_first_of(" \t\n&|^<>\"") != std::string::npos) {
+    std::string escaped = "\"";
+    for (size_t j = 0; j <= arg.size(); ++j) {
+      size_t bs = 0;
+      while (j < arg.size() && arg[j] == '\\') { ++bs; ++j; }
+      if (j == arg.size()) { escaped.append(bs * 2, '\\'); break; }
+      else if (arg[j] == '"') { escaped.append(bs * 2 + 1, '\\'); escaped += '"'; }
+      else { escaped.append(bs, '\\'); escaped += arg[j]; }
+    }
+    escaped += '"';
+    return escaped;
+  }
+  return arg;
+}
+
 // Hàm nối các tham số thành một chuỗi dòng lệnh hoàn chỉnh (có xử lý ngoặc kép và escape)
 std::string build_command_line(const std::vector<std::string>& args) {
   std::string cmd_line;
   for (size_t i = 0; i < args.size(); ++i) {
-    if (args[i].empty() || args[i].find_first_of(" \t\n&|^<>\"") != std::string::npos) {
-      cmd_line += '"';
-      for (size_t j = 0; j <= args[i].size(); ++j) {
-        size_t bs = 0;
-        while (j < args[i].size() && args[i][j] == '\\') { ++bs; ++j; }
-        if (j == args[i].size()) { cmd_line.append(bs * 2, '\\'); break; }
-        else if (args[i][j] == '"') { cmd_line.append(bs * 2 + 1, '\\'); cmd_line += '"'; }
-        else { cmd_line.append(bs, '\\'); cmd_line += args[i][j]; }
-      }
-      cmd_line += '"';
-    } else cmd_line += args[i];
+    cmd_line += escape_argument(args[i]);
     if (i < args.size() - 1) cmd_line += " ";
   }
   return cmd_line;

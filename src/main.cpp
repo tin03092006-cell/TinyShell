@@ -32,7 +32,9 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         0};
   }
   DWORD w;
-  WriteConsoleInputA(GetStdHandle(STD_INPUT_HANDLE), ir, 4, &w);
+  if (!WriteConsoleInputA(GetStdHandle(STD_INPUT_HANDLE), ir, 4, &w)) {
+    return FALSE;
+  }
   return TRUE;
 }
 
@@ -42,9 +44,39 @@ static std::string get_prompt() {
   return !ec ? cwd + "> " : "myShell> ";
 }
 
+static bool process_command_input(const std::string& input) {
+  std::vector<std::string> args;
+  try {
+    args = parse_command(input);
+  } catch (const std::invalid_argument& e) {
+    std::cout << e.what() << "\n";
+    return true; // Continue running
+  }
+  
+  bool is_background = detect_background(input, args);
+  if (args.empty()) return true;
+
+  std::string cmd = args[0];
+  string_to_lower_inplace(cmd);
+
+  int res = execute_builtin(cmd, args, is_background);
+  if (res == 1) return false; // Exit shell
+  if (res == -1) {
+    ExecutionResult execRes = execute_external(args, is_background);
+    if (!execRes.success) {
+      std::cout << "Error: Bad command or file name.\n";
+    } else if (is_background && execRes.backgroundPid != 0) {
+      std::cout << "[Background process started with PID " << execRes.backgroundPid << "]\n";
+    }
+  }
+  return true; // Continue running
+}
+
 int main() {
   std::cout << std::unitbuf;
-  SetConsoleCtrlHandler(CtrlHandler, TRUE);
+  if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
+    std::cerr << "Error: Failed to set control handler. Error: " << GetLastError() << "\n";
+  }
   std::string input;
 
   while (true) {
@@ -63,30 +95,7 @@ int main() {
     }
     if (input.empty()) continue;
 
-    std::vector<std::string> args;
-    try {
-      args = parse_command(input);
-    } catch (const std::invalid_argument& e) {
-      std::cout << e.what() << "\n";
-      continue;
-    }
-    
-    bool is_background = detect_background(input, args);
-    if (args.empty()) continue;
-
-    std::string cmd = args[0];
-    string_to_lower_inplace(cmd);
-
-    int res = execute_builtin(cmd, args, is_background);
-    if (res == 1) break;
-    if (res == -1) {
-      ExecutionResult execRes = execute_external(args, is_background);
-      if (!execRes.success) {
-        std::cout << "Error: Bad command or file name.\n";
-      } else if (is_background && execRes.backgroundPid != 0) {
-        std::cout << "[Background process started with PID " << execRes.backgroundPid << "]\n";
-      }
-    }
+    if (!process_command_input(input)) break;
   }
 
   std::cout << "Sending kill signal to all child background processes...\n";
