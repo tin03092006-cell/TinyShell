@@ -64,15 +64,13 @@ static bool process_command_input(const std::string& input) {
   std::string cmd = args[0];
   string_to_lower_inplace(cmd);
 
-  BuiltinResult res = execute_builtin(cmd, args, is_background);
-  if (res == BuiltinResult::EXIT_SHELL) return false;  // Exit shell
-  if (res == BuiltinResult::NOT_FOUND) {
-    ExecutionResult execRes = execute_external(args, is_background);
-    if (!execRes.success) {
+  if (BuiltinResult res = execute_builtin(cmd, args, is_background); res == BuiltinResult::EXIT_SHELL) {
+    return false;  // Exit shell
+  } else if (res == BuiltinResult::NOT_FOUND) {
+    if (auto [success, bgPid] = execute_external(args, is_background); !success) {
       std::cout << "Error: Bad command or file name.\n";
-    } else if (is_background && execRes.backgroundPid != 0) {
-      std::cout << "[Background process started with PID "
-                << execRes.backgroundPid << "]\n";
+    } else if (is_background && bgPid != 0) {
+      std::cout << "[Background process started with PID " << bgPid << "]\n";
     }
   }
   return true;  // Continue running
@@ -87,10 +85,9 @@ int main() {
   std::string input;
 
   while (true) {
-    auto finished = remove_finished_processes();
-    for (const auto& f : finished) {
-      std::cout << "[Background process " << f.pid
-                << " completed with exit code " << f.exitCode << "]\n";
+    for (const auto& [pid, exitCode] : remove_finished_processes()) {
+      std::cout << "[Background process " << pid
+                << " completed with exit code " << exitCode << "]\n";
     }
 
     std::cout << get_prompt();
@@ -106,10 +103,9 @@ int main() {
   }
 
   std::cout << "Sending kill signal to all child background processes...\n";
-  auto errors = terminate_all_processes();
-  for (const auto& err : errors) {
-    std::cout << "Warning: Failed to terminate PID " << err.pid
-              << " (Error: " << err.errorCode << ")\n";
+  for (const auto& [pid, errorCode] : terminate_all_processes()) {
+    std::cout << "Warning: Failed to terminate PID " << pid
+              << " (Error: " << errorCode << ")\n";
   }
 
   return 0;
