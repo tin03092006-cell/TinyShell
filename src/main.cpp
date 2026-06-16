@@ -10,6 +10,7 @@
 #include "core/process_executor.h"
 #include "core/process_manager.h"
 #include "utils/command_parser.h"
+#include "utils/string_utils.h"
 
 volatile bool ctrl_c_pressed = false;
 
@@ -48,7 +49,12 @@ int main() {
   std::string input;
 
   while (true) {
-    remove_finished_processes();
+    auto finished = remove_finished_processes();
+    for (const auto& f : finished) {
+      std::cout << "[Background process " << f.pid
+                << " completed with exit code " << f.exitCode << "]\n";
+    }
+
     std::cout << get_prompt();
     if (!std::getline(std::cin, input)) break;
     if (ctrl_c_pressed) {
@@ -58,20 +64,38 @@ int main() {
     }
     if (input.empty()) continue;
 
-    std::vector<std::string> args = parse_command(input);
+    std::vector<std::string> args;
+    try {
+      args = parse_command(input);
+    } catch (const std::invalid_argument& e) {
+      std::cout << e.what() << "\n";
+      continue;
+    }
+    
     bool is_background = detect_background(input, args);
     if (args.empty()) continue;
 
     std::string cmd = args[0];
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::tolower(c); });
+    string_to_lower_inplace(cmd);
 
     int res = execute_builtin(cmd, args, is_background);
     if (res == 1) break;
-    if (res == -1) execute_external(args, is_background);
+    if (res == -1) {
+      ExecutionResult execRes = execute_external(args, is_background);
+      if (!execRes.success) {
+        std::cout << "Error: Bad command or file name.\n";
+      } else if (is_background && execRes.backgroundPid != 0) {
+        std::cout << "[Background process started with PID " << execRes.backgroundPid << "]\n";
+      }
+    }
   }
 
   std::cout << "Sending kill signal to all child background processes...\n";
-  terminate_all_processes();
+  auto errors = terminate_all_processes();
+  for (const auto& err : errors) {
+    std::cout << "Warning: Failed to terminate PID " << err.pid
+              << " (Error: " << err.errorCode << ")\n";
+  }
 
   return 0;
 }

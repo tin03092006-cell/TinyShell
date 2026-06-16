@@ -43,15 +43,13 @@ static void wait_foreground_process(HANDLE hProcess, HANDLE hJob) {
     std::lock_guard<std::mutex> lock(mtx_foreground);
     current_foreground_process = NULL;
   }
-  if (hJob) CloseHandle(hJob);
 }
 
 // Hàm thực thi các lệnh bên ngoài (không phải built-in)
 // Quản lý việc nối chuỗi lệnh và tạo tiến trình mới (CreateProcess)
-void execute_external(std::vector<std::string>& args, bool is_background) {
-  if (args.empty()) return;
-
+ExecutionResult execute_external(std::vector<std::string>& args, bool is_background) {
   std::string cmd_line = build_command_line(args);
+  if (cmd_line.empty()) return {false, 0};
 
   STARTUPINFOA si{sizeof(si)};
   PROCESS_INFORMATION pi{};
@@ -63,8 +61,7 @@ void execute_external(std::vector<std::string>& args, bool is_background) {
 
   if (!try_create(cmd_line) &&
       !try_create("cmd.exe /s /c \"" + cmd_line + "\"")) {
-    std::cout << "Error: Bad command or file name.\n";
-    return;
+    return {false, 0};
   }
 
   // M4: Tạo Job Object cho CẢ foreground và background để quản lý toàn bộ process tree
@@ -72,13 +69,15 @@ void execute_external(std::vector<std::string>& args, bool is_background) {
 
   // Bây giờ process đã ở trong Job Object, ta mới resume cho nó chạy
   ResumeThread(pi.hThread);
+  CloseHandle(pi.hThread);
 
   if (is_background) {
     add_background_process({pi.dwProcessId, cmd_line, pi.hProcess, hJob, true, false});
-    std::cout << "[Background process started with PID " << pi.dwProcessId << "]\n";
+    return {true, pi.dwProcessId};
   } else {
     wait_foreground_process(pi.hProcess, hJob);
+    if (hJob) CloseHandle(hJob);
     CloseHandle(pi.hProcess);
+    return {true, 0};
   }
-  CloseHandle(pi.hThread);
 }

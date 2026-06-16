@@ -5,20 +5,43 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <iomanip>
 #include "../core/process_manager.h"
 #include "../utils/command_parser.h"
+#include "../utils/string_utils.h"
 
 // --- UTILITY FUNCTIONS ---
-static bool handle_pid_cmd(const std::vector<std::string>& args, std::string (*func)(DWORD), const char* name) {
-  if (args.size() < 2) std::cout << "Usage: " << name << " <pid>\n";
-  else if (!args[1].empty() && args[1].find_first_not_of("0123456789") == std::string::npos) {
+static bool handle_pid_cmd(const std::vector<std::string>& args, ProcessActionStatus (*func)(DWORD), const char* action_verb, const char* already_state, const char* name) {
+  if (args.size() < 2) {
+    std::cout << "Usage: " << name << " <pid>\n";
+    return true;
+  }
+  if (!args[1].empty() && args[1].find_first_not_of("0123456789") == std::string::npos) {
     try {
-      std::cout << func(std::stoul(args[1]));
+      DWORD pid = std::stoul(args[1]);
+      ProcessActionStatus status = func(pid);
+      std::string pstr = std::to_string(pid);
+      switch(status) {
+        case ProcessActionStatus::SUCCESS:
+          std::cout << "Process " << pstr << " " << action_verb << ".\n"; break;
+        case ProcessActionStatus::NOT_FOUND:
+          std::cout << "Error: Process " << pstr << " not found.\n"; break;
+        case ProcessActionStatus::ALREADY_EXITED:
+          std::cout << "Process " << pstr << " has already exited. Removing from list.\n"; break;
+        case ProcessActionStatus::ALREADY_IN_STATE:
+          std::cout << "Process " << pstr << " is already " << already_state << ".\n"; break;
+        case ProcessActionStatus::FAILED_DETACHED:
+          std::cout << "Failed to " << name << " process " << pstr << ". Process tree is detached.\n"; break;
+        case ProcessActionStatus::FAILED:
+        default:
+          std::cout << "Failed to " << name << " process " << pstr << ".\n"; break;
+      }
     } catch (const std::out_of_range&) {
       std::cout << "Error: Invalid PID (out of range).\n";
     }
+  } else {
+    std::cout << "Error: Invalid PID.\n";
   }
-  else std::cout << "Error: Invalid PID.\n";
   return true;
 }
 
@@ -114,9 +137,8 @@ void execute_addpath(const std::string& newPath) {
 
   std::string curLower = ";" + currentPath + ";",
               newLower = ";" + newPath + ";";
-  auto to_lower_safe = [](unsigned char c) { return std::tolower(c); };
-  std::transform(curLower.begin(), curLower.end(), curLower.begin(), to_lower_safe);
-  std::transform(newLower.begin(), newLower.end(), newLower.begin(), to_lower_safe);
+  string_to_lower_inplace(curLower);
+  string_to_lower_inplace(newLower);
   if (curLower.find(newLower) != std::string::npos) {
     std::cout << "Warning: '" << newPath << "' is already in PATH.\n";
     return;
@@ -135,20 +157,32 @@ void execute_addpath(const std::string& newPath) {
 
 // --- PROCESS MANAGEMENT COMMANDS ---
 void execute_list() {
-  std::string list = api_list_processes();
-  if (!list.empty()) std::cout << list;
+  auto processes = api_list_processes();
+  if (processes.empty()) {
+    std::cout << "No background processes running.\n";
+    return;
+  }
+  std::cout << std::left << std::setw(5) << "ID" << std::setw(12) << "PID"
+            << std::setw(12) << "Status" << "Command\n";
+  int id = 1;
+  for (const auto& p : processes) {
+    std::cout << std::left << std::setw(5) << id++ << std::setw(12) << p.pid
+              << std::setw(12)
+              << (p.isFinished ? "Exited" : (p.isRunning ? "Running" : "Stopped"))
+              << p.command << "\n";
+  }
 }
 
 bool execute_kill(const std::vector<std::string>& args) {
-  return handle_pid_cmd(args, api_kill_process, "kill");
+  return handle_pid_cmd(args, api_kill_process, "killed", "killed", "kill");
 }
 
 bool execute_stop(const std::vector<std::string>& args) {
-  return handle_pid_cmd(args, api_suspend_process, "stop");
+  return handle_pid_cmd(args, api_suspend_process, "suspended", "suspended", "stop");
 }
 
 bool execute_resume(const std::vector<std::string>& args) {
-  return handle_pid_cmd(args, api_resume_process, "resume");
+  return handle_pid_cmd(args, api_resume_process, "resumed", "running", "resume");
 }
 
 int execute_builtin(const std::string& cmd, const std::vector<std::string>& args, bool is_bg) {

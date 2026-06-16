@@ -1,7 +1,7 @@
 #include "command_parser.h"
 
 #include <cctype>
-#include <iostream>
+#include <stdexcept>
 
 // Hàm phân tách chuỗi đầu vào thành các Token (tham số)
 // Xử lý giữ nguyên khoảng trắng nếu nằm trong dấu ngoặc kép ""
@@ -21,7 +21,7 @@ std::vector<std::string> parse_command(const std::string& input) {
       if (c == '&') args.push_back("&");
     } else { arg += c; has_token = true; }
   }
-  if (in_quotes) { std::cout << "Error: Unmatched quote in command.\n"; return {}; }
+  if (in_quotes) { throw std::invalid_argument("Error: Unmatched quote in command."); }
   if (has_token || !arg.empty()) args.push_back(arg);
   return args;
 }
