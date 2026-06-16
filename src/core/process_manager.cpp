@@ -144,7 +144,7 @@ static bool toggle_job_processes(HANDLE hJob, LONG(NTAPI* func)(HANDLE)) {
   
   if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) {
     if (GetLastError() == ERROR_MORE_DATA) {
-      cb = sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) + pList->NumberOfProcessIdsInList * sizeof(ULONG_PTR);
+      cb = static_cast<DWORD>(sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) + pList->NumberOfProcessIdsInList * sizeof(ULONG_PTR));
       buf.resize(cb); 
       pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
       if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) return false;
@@ -172,8 +172,10 @@ static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
   }
   if (it->isRunning == !suspend) return ProcessActionStatus::ALREADY_IN_STATE;
 
-  auto func = (LONG(NTAPI*)(HANDLE))GetProcAddress(GetModuleHandleA("ntdll.dll"), suspend ? "NtSuspendProcess" : "NtResumeProcess");
-  if (!func) return ProcessActionStatus::FAILED;
+  auto farProc = GetProcAddress(GetModuleHandleA("ntdll.dll"), suspend ? "NtSuspendProcess" : "NtResumeProcess");
+  if (!farProc) return ProcessActionStatus::FAILED;
+  // Cast through void* to suppress -Wcast-function-type warning in GCC
+  auto func = reinterpret_cast<LONG(NTAPI*)(HANDLE)>(reinterpret_cast<void*>(farProc));
 
   bool success = false;
   if (it->hJob) {

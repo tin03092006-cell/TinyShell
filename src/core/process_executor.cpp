@@ -37,7 +37,7 @@ static HANDLE create_and_assign_job(HANDLE hProcess, bool is_background) {
 }
 
 // Hàm trợ giúp để chờ tiến trình foreground kết thúc
-static void wait_foreground_process(HANDLE hProcess, HANDLE hJob) {
+static void wait_foreground_process(HANDLE hProcess) {
   {
     std::lock_guard<std::mutex> lock(mtx_foreground);
     current_foreground_process = hProcess;
@@ -57,7 +57,8 @@ ExecutionResult execute_external(std::vector<std::string>& args, bool is_backgro
   std::string cmd_line = build_command_line(args);
   if (cmd_line.empty()) return {false, 0};
 
-  STARTUPINFOA si{sizeof(si)};
+  STARTUPINFOA si{};
+  si.cb = sizeof(si);
   PROCESS_INFORMATION pi{};
   DWORD flags = CREATE_SUSPENDED | (is_background ? CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW : 0);
 
@@ -85,7 +86,7 @@ ExecutionResult execute_external(std::vector<std::string>& args, bool is_backgro
     add_background_process({pi.dwProcessId, cmd_line, pi.hProcess, hJob, true, false});
     return {true, pi.dwProcessId};
   } else {
-    wait_foreground_process(pi.hProcess, hJob);
+    wait_foreground_process(pi.hProcess);
     if (hJob) {
       if (!CloseHandle(hJob)) std::cerr << "Warning: Failed to close job handle.\n";
     }
