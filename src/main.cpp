@@ -64,9 +64,9 @@ static bool process_command_input(const std::string& input) {
   std::string cmd = args[0];
   string_to_lower_inplace(cmd);
 
-  int res = execute_builtin(cmd, args, is_background);
-  if (res == 1) return false;  // Exit shell
-  if (res == -1) {
+  BuiltinResult res = execute_builtin(cmd, args, is_background);
+  if (res == BuiltinResult::EXIT_SHELL) return false;  // Exit shell
+  if (res == BuiltinResult::NOT_FOUND) {
     ExecutionResult execRes = execute_external(args, is_background);
     if (!execRes.success) {
       std::cout << "Error: Bad command or file name.\n";

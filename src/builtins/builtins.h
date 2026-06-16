@@ -36,9 +36,15 @@ bool execute_stop(const std::vector<std::string>& args);
 // Tiếp tục (resume) một tiến trình ngầm đã bị tạm dừng
 bool execute_resume(const std::vector<std::string>& args);
 
+// Kết quả trả về của hàm thực thi lệnh builtin
+enum class BuiltinResult {
+  NOT_FOUND,   // Lệnh không phải là builtin
+  EXECUTED,    // Lệnh là builtin và đã thực thi xong
+  EXIT_SHELL   // Lệnh là 'exit', yêu cầu thoát shell
+};
+
 // Kiểm tra và thực thi lệnh builtin nếu có
-// Trả về: 1 (thoát shell), 0 (thực thi xong), -1 (không phải builtin)
-int execute_builtin(const std::string& cmd,
-                    const std::vector<std::string>& args, bool is_background);
+BuiltinResult execute_builtin(const std::string& cmd,
+                              const std::vector<std::string>& args, bool is_background);
 
 #endif  // BUILTINS_H

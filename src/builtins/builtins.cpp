@@ -189,11 +189,10 @@ void execute_list() {
             << std::setw(12) << "Status" << "Command\n";
   int id = 1;
   for (const auto& p : processes) {
+    std::string statusStr = (p.state == ProcessState::FINISHED) ? "Exited" :
+                            (p.state == ProcessState::RUNNING) ? "Running" : "Stopped";
     std::cout << std::left << std::setw(5) << id++ << std::setw(12) << p.pid
-              << std::setw(12)
-              << (p.isFinished ? "Exited"
-                               : (p.isRunning ? "Running" : "Stopped"))
-              << p.command << "\n";
+              << std::setw(12) << statusStr << p.command << "\n";
   }
 }
 
@@ -211,15 +210,15 @@ bool execute_resume(const std::vector<std::string>& args) {
                         "resume");
 }
 
-int execute_builtin(const std::string& cmd,
-                    const std::vector<std::string>& args, bool is_bg) {
+BuiltinResult execute_builtin(const std::string& cmd,
+                              const std::vector<std::string>& args, bool is_bg) {
   if (cmd == "exit") {
     remove_finished_processes();
     if (size_t c = get_background_process_count(); c > 0)
       std::cout << "Warning: " << c
                 << " background process(es) still running. They will be "
                    "terminated.\n";
-    return 1;
+    return BuiltinResult::EXIT_SHELL;
   }
 
   struct Cmd {
@@ -250,9 +249,9 @@ int execute_builtin(const std::string& cmd,
       if (is_bg)
         std::cout << "Warning: '" << cmd << "' cannot run in background.\n";
       b.func(args);
-      return 0;
+      return BuiltinResult::EXECUTED;
     }
   }
 
-  return -1;
+  return BuiltinResult::NOT_FOUND;
 }

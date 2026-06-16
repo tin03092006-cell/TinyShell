@@ -93,7 +93,7 @@ ExecutionResult execute_external(std::vector<std::string>& args,
 
   if (is_background) {
     add_background_process(
-        {pi.dwProcessId, cmd_line, pi.hProcess, hJob, true, false});
+        {pi.dwProcessId, cmd_line, pi.hProcess, hJob, ProcessState::RUNNING});
     return {true, pi.dwProcessId};
   } else {
     wait_foreground_process(pi.hProcess);

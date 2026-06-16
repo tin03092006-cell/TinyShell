@@ -19,7 +19,7 @@ void add_background_process(const ProcessInfo& p) {
 size_t get_background_process_count() {
   std::lock_guard<std::mutex> lock(mtx_background);
   return std::count_if(background_processes.begin(), background_processes.end(),
-                       [](const ProcessInfo& p) { return !p.isFinished; });
+                       [](const ProcessInfo& p) { return p.state != ProcessState::FINISHED; });
 }
 
 // Hàm tiện ích đóng Handle của một ProcessInfo
@@ -52,7 +52,7 @@ static bool job_still_active(HANDLE hJob) {
 
 // Kiểm tra tiến trình đã thực sự kết thúc chưa (dùng chung cho kill/toggle)
 static bool is_dead(const ProcessInfo& p) {
-  if (p.isFinished) return true;
+  if (p.state == ProcessState::FINISHED) return true;
   bool rootExited = WaitForSingleObject(p.hProcess, 0) == WAIT_OBJECT_0;
   return rootExited && !job_still_active(p.hJob);
 }
@@ -64,7 +64,7 @@ std::vector<FinishedProcess> remove_finished_processes() {
   std::lock_guard<std::mutex> lock(mtx_background);
   auto it = background_processes.begin();
   while (it != background_processes.end()) {
-    if (it->isFinished) {
+    if (it->state == ProcessState::FINISHED) {
       it = background_processes.erase(it);
       continue;
     }
@@ -82,8 +82,7 @@ std::vector<FinishedProcess> remove_finished_processes() {
       finished.push_back({it->pid, code});
     }
     close_handles(*it);
-    it->isRunning = false;
-    it->isFinished = true;
+    it->state = ProcessState::FINISHED;
     ++it;
   }
   return finished;
@@ -95,7 +94,7 @@ std::vector<TerminateError> terminate_all_processes() {
   std::vector<TerminateError> errors;
   std::lock_guard<std::mutex> lock(mtx_background);
   for (auto& p : background_processes) {
-    if (!p.isFinished && WaitForSingleObject(p.hProcess, 0) != WAIT_OBJECT_0)
+    if (p.state != ProcessState::FINISHED && WaitForSingleObject(p.hProcess, 0) != WAIT_OBJECT_0)
       if (!(p.hJob ? TerminateJobObject(p.hJob, 0)
                    : TerminateProcess(p.hProcess, 0)))
         errors.push_back({p.pid, GetLastError()});
@@ -109,7 +108,7 @@ std::vector<TerminateError> terminate_all_processes() {
 static void clean_exited_processes() {
   background_processes.erase(
       std::remove_if(background_processes.begin(), background_processes.end(),
-                     [](const ProcessInfo& p) { return p.isFinished; }),
+                     [](const ProcessInfo& p) { return p.state == ProcessState::FINISHED; }),
       background_processes.end());
 }
 
@@ -186,7 +185,8 @@ static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
     background_processes.erase(it);
     return ProcessActionStatus::ALREADY_EXITED;
   }
-  if (it->isRunning == !suspend) return ProcessActionStatus::ALREADY_IN_STATE;
+  ProcessState targetState = suspend ? ProcessState::SUSPENDED : ProcessState::RUNNING;
+  if (it->state == targetState) return ProcessActionStatus::ALREADY_IN_STATE;
 
   auto farProc =
       GetProcAddress(GetModuleHandleA("ntdll.dll"),
@@ -206,7 +206,7 @@ static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
   }
 
   if (!success) return ProcessActionStatus::FAILED_DETACHED;
-  it->isRunning = !suspend;
+  it->state = targetState;
   return ProcessActionStatus::SUCCESS;
 }
 
