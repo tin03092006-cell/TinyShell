@@ -3,11 +3,7 @@
 #include <windows.h>
 
 #include <algorithm>
-#include <iomanip>
-#include <iostream>
 #include <mutex>
-#include <sstream>
-#include <string>
 #include <vector>
 
 static std::vector<ProcessInfo> background_processes;

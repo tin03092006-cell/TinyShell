@@ -1,6 +1,5 @@
 #include "builtins.h"
 #include <windows.h>
-#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
