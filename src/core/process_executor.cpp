@@ -80,7 +80,8 @@ ExecutionResult execute_external(std::vector<std::string>& args,
     return {false, 0};
   }
 
-  // Tạo Job Object cho cả foreground và background để quản lý toàn bộ process tree
+  // Tạo Job Object cho cả foreground và background để quản lý toàn bộ process
+  // tree
   HANDLE hJob = create_and_assign_job(pi.hProcess, is_background);
 
   // Bây giờ process đã ở trong Job Object, ta mới resume cho nó chạy

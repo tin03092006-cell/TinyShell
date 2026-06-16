@@ -38,13 +38,14 @@ bool execute_resume(const std::vector<std::string>& args);
 
 // Kết quả trả về của hàm thực thi lệnh builtin
 enum class BuiltinResult {
-  NOT_FOUND,   // Lệnh không phải là builtin
-  EXECUTED,    // Lệnh là builtin và đã thực thi xong
-  EXIT_SHELL   // Lệnh là 'exit', yêu cầu thoát shell
+  NOT_FOUND,  // Lệnh không phải là builtin
+  EXECUTED,   // Lệnh là builtin và đã thực thi xong
+  EXIT_SHELL  // Lệnh là 'exit', yêu cầu thoát shell
 };
 
 // Kiểm tra và thực thi lệnh builtin nếu có
 BuiltinResult execute_builtin(const std::string& cmd,
-                              const std::vector<std::string>& args, bool is_background);
+                              const std::vector<std::string>& args,
+                              bool is_background);
 
 #endif  // BUILTINS_H

@@ -54,7 +54,9 @@ static bool is_dead(const ProcessInfo& p) {
 static void clean_exited_processes() {
   background_processes.erase(
       std::remove_if(background_processes.begin(), background_processes.end(),
-                     [](const ProcessInfo& p) { return p.state == ProcessState::FINISHED; }),
+                     [](const ProcessInfo& p) {
+                       return p.state == ProcessState::FINISHED;
+                     }),
       background_processes.end());
 }
 
@@ -64,13 +66,16 @@ static bool toggle_job_processes(HANDLE hJob, LONG(NTAPI* func)(HANDLE)) {
   std::vector<BYTE> buf(cb);
   auto pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
 
-  if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) {
+  if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb,
+                                 &cb)) {
     if (GetLastError() == ERROR_MORE_DATA) {
       cb = static_cast<DWORD>(sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) +
-                              pList->NumberOfProcessIdsInList * sizeof(ULONG_PTR));
+                              pList->NumberOfProcessIdsInList *
+                                  sizeof(ULONG_PTR));
       buf.resize(cb);
       pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
-      if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb))
+      if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList,
+                                     cb, &cb))
         return false;
     } else {
       return false;
@@ -78,7 +83,8 @@ static bool toggle_job_processes(HANDLE hJob, LONG(NTAPI* func)(HANDLE)) {
   }
 
   for (DWORD i = 0; i < pList->NumberOfProcessIdsInList; ++i) {
-    if (HANDLE h = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, static_cast<DWORD>(pList->ProcessIdList[i]))) {
+    if (HANDLE h = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE,
+                               static_cast<DWORD>(pList->ProcessIdList[i]))) {
       func(h);
       CloseHandle(h);
     }
@@ -86,11 +92,13 @@ static bool toggle_job_processes(HANDLE hJob, LONG(NTAPI* func)(HANDLE)) {
   return true;
 }
 
-// Hàm cốt lõi thực hiện tạm dừng (suspend) hoặc tiếp tục (resume) một tiến trình ngầm
+// Hàm cốt lõi thực hiện tạm dừng (suspend) hoặc tiếp tục (resume) một tiến
+// trình ngầm
 static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
   std::lock_guard<std::mutex> lock(mtx_background);
-  auto it = std::find_if(background_processes.begin(), background_processes.end(),
-                         [pid](const auto& p) { return p.pid == pid; });
+  auto it =
+      std::find_if(background_processes.begin(), background_processes.end(),
+                   [pid](const auto& p) { return p.pid == pid; });
 
   if (it == background_processes.end()) return ProcessActionStatus::NOT_FOUND;
   if (is_dead(*it)) {
@@ -98,15 +106,18 @@ static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
     background_processes.erase(it);
     return ProcessActionStatus::ALREADY_EXITED;
   }
-  ProcessState targetState = suspend ? ProcessState::SUSPENDED : ProcessState::RUNNING;
+  ProcessState targetState =
+      suspend ? ProcessState::SUSPENDED : ProcessState::RUNNING;
   if (it->state == targetState) return ProcessActionStatus::ALREADY_IN_STATE;
 
-  auto farProc = GetProcAddress(GetModuleHandleA("ntdll.dll"),
-                                suspend ? "NtSuspendProcess" : "NtResumeProcess");
+  auto farProc =
+      GetProcAddress(GetModuleHandleA("ntdll.dll"),
+                     suspend ? "NtSuspendProcess" : "NtResumeProcess");
   if (!farProc) return ProcessActionStatus::FAILED;
-  
+
   // Cast qua void* để bỏ qua cảnh báo -Wcast-function-type của GCC
-  auto func = reinterpret_cast<LONG(NTAPI*)(HANDLE)>(reinterpret_cast<void*>(farProc));
+  auto func =
+      reinterpret_cast<LONG(NTAPI*)(HANDLE)>(reinterpret_cast<void*>(farProc));
 
   bool success = false;
   if (it->hJob) {
@@ -133,8 +144,9 @@ void add_background_process(const ProcessInfo& p) {
 
 size_t get_background_process_count() {
   std::lock_guard<std::mutex> lock(mtx_background);
-  return std::count_if(background_processes.begin(), background_processes.end(),
-                       [](const ProcessInfo& p) { return p.state != ProcessState::FINISHED; });
+  return std::count_if(
+      background_processes.begin(), background_processes.end(),
+      [](const ProcessInfo& p) { return p.state != ProcessState::FINISHED; });
 }
 
 std::vector<FinishedProcess> remove_finished_processes() {
@@ -170,8 +182,10 @@ std::vector<TerminateError> terminate_all_processes() {
   std::vector<TerminateError> errors;
   std::lock_guard<std::mutex> lock(mtx_background);
   for (auto& p : background_processes) {
-    if (p.state != ProcessState::FINISHED && WaitForSingleObject(p.hProcess, 0) != WAIT_OBJECT_0)
-      if (!(p.hJob ? TerminateJobObject(p.hJob, 0) : TerminateProcess(p.hProcess, 0)))
+    if (p.state != ProcessState::FINISHED &&
+        WaitForSingleObject(p.hProcess, 0) != WAIT_OBJECT_0)
+      if (!(p.hJob ? TerminateJobObject(p.hJob, 0)
+                   : TerminateProcess(p.hProcess, 0)))
         errors.push_back({p.pid, GetLastError()});
     close_handles(p);
   }
@@ -192,8 +206,9 @@ std::vector<ProcessInfo> api_list_processes() {
 
 ProcessActionStatus api_kill_process(DWORD pid) {
   std::lock_guard<std::mutex> lock(mtx_background);
-  auto it = std::find_if(background_processes.begin(), background_processes.end(),
-                         [pid](const auto& p) { return p.pid == pid; });
+  auto it =
+      std::find_if(background_processes.begin(), background_processes.end(),
+                   [pid](const auto& p) { return p.pid == pid; });
   if (it == background_processes.end()) return ProcessActionStatus::NOT_FOUND;
 
   if (is_dead(*it)) {
@@ -202,7 +217,8 @@ ProcessActionStatus api_kill_process(DWORD pid) {
     return ProcessActionStatus::ALREADY_EXITED;
   }
 
-  bool success = (it->hJob ? TerminateJobObject(it->hJob, 0) : TerminateProcess(it->hProcess, 0));
+  bool success = (it->hJob ? TerminateJobObject(it->hJob, 0)
+                           : TerminateProcess(it->hProcess, 0));
   close_handles(*it);
   background_processes.erase(it);
   return success ? ProcessActionStatus::SUCCESS : ProcessActionStatus::FAILED;

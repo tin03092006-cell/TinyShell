@@ -40,7 +40,8 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   return TRUE;
 }
 
-// Lấy chuỗi prompt hiển thị cho người dùng, chứa đường dẫn thư mục hiện tại (CWD)
+// Lấy chuỗi prompt hiển thị cho người dùng, chứa đường dẫn thư mục hiện tại
+// (CWD)
 static std::string get_prompt() {
   std::error_code ec;
   std::string cwd = std::filesystem::current_path(ec).string();
@@ -64,10 +65,12 @@ static bool process_command_input(const std::string& input) {
   std::string cmd = args[0];
   string_to_lower_inplace(cmd);
 
-  if (BuiltinResult res = execute_builtin(cmd, args, is_background); res == BuiltinResult::EXIT_SHELL) {
+  if (BuiltinResult res = execute_builtin(cmd, args, is_background);
+      res == BuiltinResult::EXIT_SHELL) {
     return false;  // Exit shell
   } else if (res == BuiltinResult::NOT_FOUND) {
-    if (auto [success, bgPid] = execute_external(args, is_background); !success) {
+    if (auto [success, bgPid] = execute_external(args, is_background);
+        !success) {
       std::cout << "Error: Bad command or file name.\n";
     } else if (is_background && bgPid != 0) {
       std::cout << "[Background process started with PID " << bgPid << "]\n";
@@ -86,8 +89,8 @@ int main() {
 
   while (true) {
     for (const auto& [pid, exitCode] : remove_finished_processes()) {
-      std::cout << "[Background process " << pid
-                << " completed with exit code " << exitCode << "]\n";
+      std::cout << "[Background process " << pid << " completed with exit code "
+                << exitCode << "]\n";
     }
 
     std::cout << get_prompt();

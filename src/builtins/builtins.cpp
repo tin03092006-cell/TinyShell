@@ -189,8 +189,9 @@ void execute_list() {
             << std::setw(12) << "Status" << "Command\n";
   int id = 1;
   for (const auto& p : processes) {
-    std::string statusStr = (p.state == ProcessState::FINISHED) ? "Exited" :
-                            (p.state == ProcessState::RUNNING) ? "Running" : "Stopped";
+    std::string statusStr = (p.state == ProcessState::FINISHED)  ? "Exited"
+                            : (p.state == ProcessState::RUNNING) ? "Running"
+                                                                 : "Stopped";
     std::cout << std::left << std::setw(5) << id++ << std::setw(12) << p.pid
               << std::setw(12) << statusStr << p.command << "\n";
   }
@@ -211,7 +212,8 @@ bool execute_resume(const std::vector<std::string>& args) {
 }
 
 BuiltinResult execute_builtin(const std::string& cmd,
-                              const std::vector<std::string>& args, bool is_bg) {
+                              const std::vector<std::string>& args,
+                              bool is_bg) {
   if (cmd == "exit") {
     remove_finished_processes();
     if (size_t c = get_background_process_count(); c > 0)

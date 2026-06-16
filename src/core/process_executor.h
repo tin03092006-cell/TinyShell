@@ -8,8 +8,9 @@
 
 // Cấu trúc lưu trữ kết quả của việc thực thi tiến trình
 struct ExecutionResult {
-  bool success;         // Thành công hay không
-  DWORD backgroundPid;  // PID của tiến trình ngầm (nếu có), hoặc 0 nếu chạy nền thất bại/chạy foreground
+  bool success;  // Thành công hay không
+  DWORD backgroundPid;  // PID của tiến trình ngầm (nếu có), hoặc 0 nếu chạy nền
+                        // thất bại/chạy foreground
 };
 
 // Kiểm tra xem có tiến trình foreground nào đang chạy hay không
