@@ -11,13 +11,15 @@
 #include "utils/command_parser.h"
 #include "utils/string_utils.h"
 
+// Biến cờ (flag) để theo dõi trạng thái xem phím Ctrl+C đã được nhấn hay chưa
 volatile bool ctrl_c_pressed = false;
 
+// Hàm xử lý tín hiệu (signal handler) từ console, đặc biệt là sự kiện Ctrl+C
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   if (fdwCtrlType == CTRL_BREAK_EVENT) return TRUE;
   if (fdwCtrlType != CTRL_C_EVENT) return FALSE;
   if (has_foreground_process()) return TRUE;
-  
+
   ctrl_c_pressed = true;
 
   INPUT_RECORD ir[4] = {};
@@ -38,21 +40,24 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   return TRUE;
 }
 
+// Lấy chuỗi prompt hiển thị cho người dùng, chứa đường dẫn thư mục hiện tại (CWD)
 static std::string get_prompt() {
   std::error_code ec;
   std::string cwd = std::filesystem::current_path(ec).string();
   return !ec ? cwd + "> " : "myShell> ";
 }
 
+// Phân tích và thực thi chuỗi lệnh nhập vào từ người dùng
+// Trả về false nếu lệnh yêu cầu thoát shell, true nếu tiếp tục
 static bool process_command_input(const std::string& input) {
   std::vector<std::string> args;
   try {
     args = parse_command(input);
   } catch (const std::invalid_argument& e) {
     std::cout << e.what() << "\n";
-    return true; // Continue running
+    return true;  // Continue running
   }
-  
+
   bool is_background = detect_background(input, args);
   if (args.empty()) return true;
 
@@ -60,22 +65,24 @@ static bool process_command_input(const std::string& input) {
   string_to_lower_inplace(cmd);
 
   int res = execute_builtin(cmd, args, is_background);
-  if (res == 1) return false; // Exit shell
+  if (res == 1) return false;  // Exit shell
   if (res == -1) {
     ExecutionResult execRes = execute_external(args, is_background);
     if (!execRes.success) {
       std::cout << "Error: Bad command or file name.\n";
     } else if (is_background && execRes.backgroundPid != 0) {
-      std::cout << "[Background process started with PID " << execRes.backgroundPid << "]\n";
+      std::cout << "[Background process started with PID "
+                << execRes.backgroundPid << "]\n";
     }
   }
-  return true; // Continue running
+  return true;  // Continue running
 }
 
 int main() {
   std::cout << std::unitbuf;
   if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
-    std::cerr << "Error: Failed to set control handler. Error: " << GetLastError() << "\n";
+    std::cerr << "Error: Failed to set control handler. Error: "
+              << GetLastError() << "\n";
   }
   std::string input;
 

@@ -38,6 +38,7 @@ bool execute_resume(const std::vector<std::string>& args);
 
 // Kiểm tra và thực thi lệnh builtin nếu có
 // Trả về: 1 (thoát shell), 0 (thực thi xong), -1 (không phải builtin)
-int execute_builtin(const std::string& cmd, const std::vector<std::string>& args, bool is_background);
+int execute_builtin(const std::string& cmd,
+                    const std::vector<std::string>& args, bool is_background);
 
 #endif  // BUILTINS_H

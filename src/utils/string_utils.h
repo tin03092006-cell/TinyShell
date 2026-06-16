@@ -3,7 +3,8 @@
 
 #include <string>
 
-// Chuyển đổi toàn bộ các ký tự trong chuỗi thành chữ thường một cách an toàn (tránh Undefined Behavior với non-ASCII)
+// Chuyển đổi toàn bộ các ký tự trong chuỗi thành chữ thường một cách an toàn
+// (tránh Undefined Behavior với non-ASCII)
 void string_to_lower_inplace(std::string& str);
 
-#endif // STRING_UTILS_H
+#endif  // STRING_UTILS_H

@@ -8,7 +8,8 @@
 std::vector<std::string> parse_command(const std::string& input);
 
 // Kiểm tra xem lệnh có yêu cầu chạy ngầm (chứa dấu '&' ở cuối) hay không
-bool detect_background(const std::string& input, std::vector<std::string>& args);
+bool detect_background(const std::string& input,
+                       std::vector<std::string>& args);
 
 // Nối mảng tham số thành một chuỗi duy nhất cách nhau bởi khoảng trắng (bắt đầu
 // từ vị trí start)

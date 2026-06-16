@@ -3,11 +3,13 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <iostream>
 #include <mutex>
 #include <vector>
-#include <iostream>
 
+// Danh sách lưu trữ các tiến trình ngầm đang được shell quản lý
 static std::vector<ProcessInfo> background_processes;
+// Mutex để bảo đảm an toàn luồng (thread-safety) khi truy cập danh sách tiến trình ngầm
 static std::mutex mtx_background;
 
 void add_background_process(const ProcessInfo& p) {
@@ -121,16 +123,19 @@ std::vector<ProcessInfo> api_list_processes() {
 // Lệnh kill: Kết thúc một tiến trình ngầm theo PID
 ProcessActionStatus api_kill_process(DWORD pid) {
   std::lock_guard<std::mutex> lock(mtx_background);
-  auto it = std::find_if(background_processes.begin(), background_processes.end(),
-                         [pid](const auto& p) { return p.pid == pid; });
+  auto it =
+      std::find_if(background_processes.begin(), background_processes.end(),
+                   [pid](const auto& p) { return p.pid == pid; });
   if (it == background_processes.end()) return ProcessActionStatus::NOT_FOUND;
 
   if (is_dead(*it)) {
-    close_handles(*it); background_processes.erase(it);
+    close_handles(*it);
+    background_processes.erase(it);
     return ProcessActionStatus::ALREADY_EXITED;
   }
-  
-  bool success = (it->hJob ? TerminateJobObject(it->hJob, 0) : TerminateProcess(it->hProcess, 0));
+
+  bool success = (it->hJob ? TerminateJobObject(it->hJob, 0)
+                           : TerminateProcess(it->hProcess, 0));
   close_handles(*it);
   background_processes.erase(it);
   return success ? ProcessActionStatus::SUCCESS : ProcessActionStatus::FAILED;
@@ -141,41 +146,55 @@ static bool toggle_job_processes(HANDLE hJob, LONG(NTAPI* func)(HANDLE)) {
   DWORD cb = sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) + 256 * sizeof(ULONG_PTR);
   std::vector<BYTE> buf(cb);
   auto pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
-  
-  if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) {
+
+  if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb,
+                                 &cb)) {
     if (GetLastError() == ERROR_MORE_DATA) {
-      cb = static_cast<DWORD>(sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) + pList->NumberOfProcessIdsInList * sizeof(ULONG_PTR));
-      buf.resize(cb); 
+      cb = static_cast<DWORD>(sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) +
+                              pList->NumberOfProcessIdsInList *
+                                  sizeof(ULONG_PTR));
+      buf.resize(cb);
       pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
-      if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) return false;
+      if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList,
+                                     cb, &cb))
+        return false;
     } else {
       return false;
     }
   }
-  
+
   for (DWORD i = 0; i < pList->NumberOfProcessIdsInList; ++i) {
-    if (HANDLE h = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, static_cast<DWORD>(pList->ProcessIdList[i]))) {
-      func(h); CloseHandle(h);
+    if (HANDLE h = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE,
+                               static_cast<DWORD>(pList->ProcessIdList[i]))) {
+      func(h);
+      CloseHandle(h);
     }
   }
   return true;
 }
 
+// Hàm cốt lõi để thực hiện tạm dừng (suspend) hoặc tiếp tục (resume) một tiến trình ngầm
 static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
   std::lock_guard<std::mutex> lock(mtx_background);
-  auto it = std::find_if(background_processes.begin(), background_processes.end(), [pid](const auto& p) { return p.pid == pid; });
+  auto it =
+      std::find_if(background_processes.begin(), background_processes.end(),
+                   [pid](const auto& p) { return p.pid == pid; });
 
   if (it == background_processes.end()) return ProcessActionStatus::NOT_FOUND;
   if (is_dead(*it)) {
-    close_handles(*it); background_processes.erase(it);
+    close_handles(*it);
+    background_processes.erase(it);
     return ProcessActionStatus::ALREADY_EXITED;
   }
   if (it->isRunning == !suspend) return ProcessActionStatus::ALREADY_IN_STATE;
 
-  auto farProc = GetProcAddress(GetModuleHandleA("ntdll.dll"), suspend ? "NtSuspendProcess" : "NtResumeProcess");
+  auto farProc =
+      GetProcAddress(GetModuleHandleA("ntdll.dll"),
+                     suspend ? "NtSuspendProcess" : "NtResumeProcess");
   if (!farProc) return ProcessActionStatus::FAILED;
   // Cast through void* to suppress -Wcast-function-type warning in GCC
-  auto func = reinterpret_cast<LONG(NTAPI*)(HANDLE)>(reinterpret_cast<void*>(farProc));
+  auto func =
+      reinterpret_cast<LONG(NTAPI*)(HANDLE)>(reinterpret_cast<void*>(farProc));
 
   bool success = false;
   if (it->hJob) {
@@ -192,7 +211,11 @@ static ProcessActionStatus toggle_process(DWORD pid, bool suspend) {
 }
 
 // Lệnh stop: Tạm dừng một tiến trình ngầm theo PID
-ProcessActionStatus api_suspend_process(DWORD pid) { return toggle_process(pid, true); }
+ProcessActionStatus api_suspend_process(DWORD pid) {
+  return toggle_process(pid, true);
+}
 
 // Lệnh resume: Tiếp tục chạy một tiến trình ngầm đã bị suspend
-ProcessActionStatus api_resume_process(DWORD pid) { return toggle_process(pid, false); }
+ProcessActionStatus api_resume_process(DWORD pid) {
+  return toggle_process(pid, false);
+}

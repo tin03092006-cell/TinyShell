@@ -1,39 +1,55 @@
 #include "builtins.h"
+
 #include <windows.h>
+
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <iomanip>
+
 #include "../core/process_manager.h"
 #include "../utils/command_parser.h"
 #include "../utils/string_utils.h"
 
 // --- UTILITY FUNCTIONS ---
-static bool handle_pid_cmd(const std::vector<std::string>& args, ProcessActionStatus (*func)(DWORD), const char* action_verb, const char* already_state, const char* name) {
+static bool handle_pid_cmd(const std::vector<std::string>& args,
+                           ProcessActionStatus (*func)(DWORD),
+                           const char* action_verb, const char* already_state,
+                           const char* name) {
   if (args.size() < 2) {
     std::cout << "Usage: " << name << " <pid>\n";
     return true;
   }
-  if (!args[1].empty() && args[1].find_first_not_of("0123456789") == std::string::npos) {
+  if (!args[1].empty() &&
+      args[1].find_first_not_of("0123456789") == std::string::npos) {
     try {
       DWORD pid = std::stoul(args[1]);
       ProcessActionStatus status = func(pid);
       std::string pstr = std::to_string(pid);
-      switch(status) {
+      switch (status) {
         case ProcessActionStatus::SUCCESS:
-          std::cout << "Process " << pstr << " " << action_verb << ".\n"; break;
+          std::cout << "Process " << pstr << " " << action_verb << ".\n";
+          break;
         case ProcessActionStatus::NOT_FOUND:
-          std::cout << "Error: Process " << pstr << " not found.\n"; break;
+          std::cout << "Error: Process " << pstr << " not found.\n";
+          break;
         case ProcessActionStatus::ALREADY_EXITED:
-          std::cout << "Process " << pstr << " has already exited. Removing from list.\n"; break;
+          std::cout << "Process " << pstr
+                    << " has already exited. Removing from list.\n";
+          break;
         case ProcessActionStatus::ALREADY_IN_STATE:
-          std::cout << "Process " << pstr << " is already " << already_state << ".\n"; break;
+          std::cout << "Process " << pstr << " is already " << already_state
+                    << ".\n";
+          break;
         case ProcessActionStatus::FAILED_DETACHED:
-          std::cout << "Failed to " << name << " process " << pstr << ". Process tree is detached.\n"; break;
+          std::cout << "Failed to " << name << " process " << pstr
+                    << ". Process tree is detached.\n";
+          break;
         case ProcessActionStatus::FAILED:
         default:
-          std::cout << "Failed to " << name << " process " << pstr << ".\n"; break;
+          std::cout << "Failed to " << name << " process " << pstr << ".\n";
+          break;
       }
     } catch (const std::out_of_range&) {
       std::cout << "Error: Invalid PID (out of range).\n";
@@ -81,8 +97,10 @@ void execute_time() {
 // --- FILESYSTEM COMMANDS ---
 void execute_cd(const std::vector<std::string>& args) {
   try {
-    if (args.size() > 1) std::filesystem::current_path(join_args(args));
-    else std::cout << std::filesystem::current_path().string() << "\n";
+    if (args.size() > 1)
+      std::filesystem::current_path(join_args(args));
+    else
+      std::cout << std::filesystem::current_path().string() << "\n";
   } catch (const std::filesystem::filesystem_error&) {
     std::cout << "Error: The system cannot find the path specified.\n";
   }
@@ -153,7 +171,8 @@ void execute_addpath(const std::string& newPath) {
     return;
   }
   if (!SetEnvironmentVariableA("PATH", updatedPath.c_str())) {
-    std::cout << "Error: Failed to update PATH. Error: " << GetLastError() << "\n";
+    std::cout << "Error: Failed to update PATH. Error: " << GetLastError()
+              << "\n";
   } else {
     std::cout << "PATH updated.\n";
   }
@@ -172,7 +191,8 @@ void execute_list() {
   for (const auto& p : processes) {
     std::cout << std::left << std::setw(5) << id++ << std::setw(12) << p.pid
               << std::setw(12)
-              << (p.isFinished ? "Exited" : (p.isRunning ? "Running" : "Stopped"))
+              << (p.isFinished ? "Exited"
+                               : (p.isRunning ? "Running" : "Stopped"))
               << p.command << "\n";
   }
 }
@@ -182,39 +202,53 @@ bool execute_kill(const std::vector<std::string>& args) {
 }
 
 bool execute_stop(const std::vector<std::string>& args) {
-  return handle_pid_cmd(args, api_suspend_process, "suspended", "suspended", "stop");
+  return handle_pid_cmd(args, api_suspend_process, "suspended", "suspended",
+                        "stop");
 }
 
 bool execute_resume(const std::vector<std::string>& args) {
-  return handle_pid_cmd(args, api_resume_process, "resumed", "running", "resume");
+  return handle_pid_cmd(args, api_resume_process, "resumed", "running",
+                        "resume");
 }
 
-int execute_builtin(const std::string& cmd, const std::vector<std::string>& args, bool is_bg) {
+int execute_builtin(const std::string& cmd,
+                    const std::vector<std::string>& args, bool is_bg) {
   if (cmd == "exit") {
     remove_finished_processes();
     if (size_t c = get_background_process_count(); c > 0)
-      std::cout << "Warning: " << c << " background process(es) still running. They will be terminated.\n";
+      std::cout << "Warning: " << c
+                << " background process(es) still running. They will be "
+                   "terminated.\n";
     return 1;
   }
 
-  struct Cmd { const char* name; void (*func)(const std::vector<std::string>&); };
-  static const Cmd builtins[] = {
-    {"cd", execute_cd},
-    {"help", [](const auto&){ execute_help(); }},
-    {"date", [](const auto&){ execute_date(); }},
-    {"time", [](const auto&){ execute_time(); }},
-    {"dir", execute_dir},
-    {"path", [](const auto&){ execute_path(); }},
-    {"addpath", [](const auto& a){ if (a.size() > 1) execute_addpath(join_args(a)); else std::cout << "Usage: addpath <directory>\n"; }},
-    {"list", [](const auto&){ execute_list(); }},
-    {"kill", [](const auto& a){ execute_kill(a); }},
-    {"stop", [](const auto& a){ execute_stop(a); }},
-    {"resume", [](const auto& a){ execute_resume(a); }}
+  struct Cmd {
+    const char* name;
+    void (*func)(const std::vector<std::string>&);
   };
+  static const Cmd builtins[] = {
+      {"cd", execute_cd},
+      {"help", [](const auto&) { execute_help(); }},
+      {"date", [](const auto&) { execute_date(); }},
+      {"time", [](const auto&) { execute_time(); }},
+      {"dir", execute_dir},
+      {"path", [](const auto&) { execute_path(); }},
+      {"addpath",
+       [](const auto& a) {
+         if (a.size() > 1)
+           execute_addpath(join_args(a));
+         else
+           std::cout << "Usage: addpath <directory>\n";
+       }},
+      {"list", [](const auto&) { execute_list(); }},
+      {"kill", [](const auto& a) { execute_kill(a); }},
+      {"stop", [](const auto& a) { execute_stop(a); }},
+      {"resume", [](const auto& a) { execute_resume(a); }}};
 
   for (const auto& b : builtins) {
     if (cmd == b.name) {
-      if (is_bg) std::cout << "Warning: '" << cmd << "' cannot run in background.\n";
+      if (is_bg)
+        std::cout << "Warning: '" << cmd << "' cannot run in background.\n";
       b.func(args);
       return 0;
     }
