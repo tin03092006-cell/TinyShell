@@ -11,11 +11,14 @@
 #include "core/process_manager.h"
 #include "utils/command_parser.h"
 
+volatile bool ctrl_c_pressed = false;
 
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   if (fdwCtrlType == CTRL_BREAK_EVENT) return TRUE;
   if (fdwCtrlType != CTRL_C_EVENT) return FALSE;
   if (has_foreground_process()) return TRUE;
+  
+  ctrl_c_pressed = true;
 
   INPUT_RECORD ir[4] = {};
   for (int i = 0; i < 4; i++) {
@@ -48,14 +51,19 @@ int main() {
     remove_finished_processes();
     std::cout << get_prompt();
     if (!std::getline(std::cin, input)) break;
+    if (ctrl_c_pressed) {
+      ctrl_c_pressed = false;
+      std::cout << "\n";
+      continue;
+    }
     if (input.empty()) continue;
 
     std::vector<std::string> args = parse_command(input);
-    bool is_background = detect_background(args);
+    bool is_background = detect_background(input, args);
     if (args.empty()) continue;
 
     std::string cmd = args[0];
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
+    std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::tolower(c); });
 
     int res = execute_builtin(cmd, args, is_background);
     if (res == 1) break;

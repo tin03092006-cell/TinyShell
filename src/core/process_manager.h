@@ -1,6 +1,5 @@
 #ifndef PROCESS_MANAGER_H
 #define PROCESS_MANAGER_H
-
 #include <windows.h>
 #include <string>
 #include "process_info.h"
@@ -21,7 +20,8 @@ std::string api_kill_process(DWORD pid);
 // Tạm dừng (suspend) một tiến trình ngầm và trả về thông báo kết quả
 std::string api_suspend_process(DWORD pid);
 
-// Tiếp tục (resume) một tiến trình ngầm đã bị tạm dừng và trả về thông báo kết quả
+// Tiếp tục (resume) một tiến trình ngầm đã bị tạm dừng và trả về thông báo kết
+// quả
 std::string api_resume_process(DWORD pid);
 
 #endif  // PROCESS_MANAGER_H

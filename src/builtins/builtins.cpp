@@ -1,20 +1,23 @@
 #include "builtins.h"
-
 #include <windows.h>
-
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
-
 #include "../core/process_manager.h"
 #include "../utils/command_parser.h"
 
 // --- UTILITY FUNCTIONS ---
 static bool handle_pid_cmd(const std::vector<std::string>& args, std::string (*func)(DWORD), const char* name) {
   if (args.size() < 2) std::cout << "Usage: " << name << " <pid>\n";
-  else if (!args[1].empty() && args[1].find_first_not_of("0123456789") == std::string::npos) std::cout << func(std::stoul(args[1]));
+  else if (!args[1].empty() && args[1].find_first_not_of("0123456789") == std::string::npos) {
+    try {
+      std::cout << func(std::stoul(args[1]));
+    } catch (const std::out_of_range&) {
+      std::cout << "Error: Invalid PID (out of range).\n";
+    }
+  }
   else std::cout << "Error: Invalid PID.\n";
   return true;
 }
@@ -65,17 +68,25 @@ void execute_cd(const std::vector<std::string>& args) {
 
 void execute_dir(const std::vector<std::string>& args) {
   std::string target = (args.size() > 1) ? join_args(args) : ".";
-  try {
-    if (std::filesystem::is_directory(target)) {
-      for (const auto& entry : std::filesystem::directory_iterator(target))
-        std::cout << entry.path().filename().string() << "\n";
-    } else if (std::filesystem::exists(target)) {
-      std::cout << std::filesystem::path(target).filename().string() << "\n";
-    } else {
-      std::cout << "Error: File not found.\n";
-    }
-  } catch (const std::filesystem::filesystem_error&) {
-    std::cout << "Error: Cannot open directory.\n";
+  std::string search_pattern = target;
+
+  std::error_code ec;
+  if (std::filesystem::is_directory(target, ec)) {
+    search_pattern += "\\*";
+  }
+
+  WIN32_FIND_DATAA findData;
+  HANDLE hFind = FindFirstFileA(search_pattern.c_str(), &findData);
+  if (hFind != INVALID_HANDLE_VALUE) {
+    do {
+      std::string filename = findData.cFileName;
+      if (filename != "." && filename != "..") {
+        std::cout << filename << "\n";
+      }
+    } while (FindNextFileA(hFind, &findData));
+    FindClose(hFind);
+  } else {
+    std::cout << "Error: File not found.\n";
   }
 }
 
@@ -103,8 +114,9 @@ void execute_addpath(const std::string& newPath) {
 
   std::string curLower = ";" + currentPath + ";",
               newLower = ";" + newPath + ";";
-  std::transform(curLower.begin(), curLower.end(), curLower.begin(), ::tolower);
-  std::transform(newLower.begin(), newLower.end(), newLower.begin(), ::tolower);
+  auto to_lower_safe = [](unsigned char c) { return std::tolower(c); };
+  std::transform(curLower.begin(), curLower.end(), curLower.begin(), to_lower_safe);
+  std::transform(newLower.begin(), newLower.end(), newLower.begin(), to_lower_safe);
   if (curLower.find(newLower) != std::string::npos) {
     std::cout << "Warning: '" << newPath << "' is already in PATH.\n";
     return;

@@ -19,7 +19,8 @@ void add_background_process(const ProcessInfo& p) {
 }
 size_t get_background_process_count() {
   std::lock_guard<std::mutex> lock(mtx_background);
-  return background_processes.size();
+  return std::count_if(background_processes.begin(), background_processes.end(),
+                       [](const ProcessInfo& p) { return !p.isFinished; });
 }
 
 // Hàm tiện ích đóng Handle của một ProcessInfo
@@ -62,21 +63,28 @@ static bool is_dead(const ProcessInfo& p) {
 //     kết thúc ít nhất 1 lần.
 void remove_finished_processes() {
   std::lock_guard<std::mutex> lock(mtx_background);
-  for (auto& p : background_processes) {
-    if (p.isFinished) continue;
-    DWORD wr = WaitForSingleObject(p.hProcess, 0);
-    if ((wr != WAIT_OBJECT_0 && wr != WAIT_FAILED) ||
-        (wr == WAIT_OBJECT_0 && job_still_active(p.hJob)))
+  auto it = background_processes.begin();
+  while (it != background_processes.end()) {
+    if (it->isFinished) {
+      it = background_processes.erase(it);
       continue;
+    }
+    DWORD wr = WaitForSingleObject(it->hProcess, 0);
+    if ((wr != WAIT_OBJECT_0 && wr != WAIT_FAILED) ||
+        (wr == WAIT_OBJECT_0 && job_still_active(it->hJob))) {
+      ++it;
+      continue;
+    }
     if (wr == WAIT_OBJECT_0) {
       DWORD code = 0;
-      GetExitCodeProcess(p.hProcess, &code);
-      std::cout << "[Background process " << p.pid
+      GetExitCodeProcess(it->hProcess, &code);
+      std::cout << "[Background process " << it->pid
                 << " completed with exit code " << code << "]\n";
     }
-    close_handles(p);
-    p.isRunning = false;
-    p.isFinished = true;
+    close_handles(*it);
+    it->isRunning = false;
+    it->isFinished = true;
+    ++it;
   }
 }
 
@@ -147,8 +155,14 @@ static bool toggle_job_processes(HANDLE hJob, LONG(NTAPI* func)(HANDLE)) {
   auto pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
   
   if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) {
-    buf.resize(cb); pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
-    if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) return false;
+    if (GetLastError() == ERROR_MORE_DATA) {
+      cb = sizeof(JOBOBJECT_BASIC_PROCESS_ID_LIST) + pList->NumberOfProcessIdsInList * sizeof(ULONG_PTR);
+      buf.resize(cb); 
+      pList = reinterpret_cast<PJOBOBJECT_BASIC_PROCESS_ID_LIST>(buf.data());
+      if (!QueryInformationJobObject(hJob, JobObjectBasicProcessIdList, pList, cb, &cb)) return false;
+    } else {
+      return false;
+    }
   }
   
   for (DWORD i = 0; i < pList->NumberOfProcessIdsInList; ++i) {

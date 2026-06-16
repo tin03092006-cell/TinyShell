@@ -11,7 +11,7 @@ std::vector<std::string> parse_command(const std::string& input) {
   bool in_quotes = false, has_token = false;
   for (size_t i = 0; i < input.size(); ++i) {
     char c = input[i];
-    if (c == '\\' && !in_quotes && i + 1 < input.size()) {
+    if (c == '\\' && i + 1 < input.size()) {
       char next = input[++i];
       arg += (next == '"' || next == '\\') ? next : (--i, c);
       has_token = true;
@@ -28,12 +28,17 @@ std::vector<std::string> parse_command(const std::string& input) {
 
 // Kiểm tra xem lệnh có kết thúc bằng dấu '&' (yêu cầu chạy ngầm) hay không
 // Nếu có, xóa '&' khỏi danh sách tham số và trả về true.
-bool detect_background(std::vector<std::string>& args) {
-  if (!args.empty() && args.back() == "&") {
-    args.pop_back();
-    return true;
-  }
-  return false;
+bool detect_background(const std::string& input, std::vector<std::string>& args) {
+  if (args.empty() || args.back() != "&") return false;
+  size_t pos = input.find_last_not_of(" \t\n\r");
+  if (pos == std::string::npos || input[pos] != '&') return false;
+  
+  size_t bs = 0;
+  for (int i = static_cast<int>(pos) - 1; i >= 0 && input[i] == '\\'; --i) bs++;
+  if (bs % 2 != 0) return false;
+
+  args.pop_back();
+  return true;
 }
 
 // Hàm nối các phần tử của mảng thành một chuỗi duy nhất, cách nhau bằng khoảng
@@ -51,7 +56,7 @@ std::string join_args(const std::vector<std::string>& args, size_t start) {
 std::string build_command_line(const std::vector<std::string>& args) {
   std::string cmd_line;
   for (size_t i = 0; i < args.size(); ++i) {
-    if (args[i].empty() || args[i].find_first_of(" &|^<>\"") != std::string::npos) {
+    if (args[i].empty() || args[i].find_first_of(" \t\n&|^<>\"") != std::string::npos) {
       cmd_line += '"';
       for (size_t j = 0; j <= args[i].size(); ++j) {
         size_t bs = 0;
