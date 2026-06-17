@@ -45,19 +45,8 @@ static bool job_still_active(HANDLE hJob) {
 
 // Kiểm tra tiến trình đã thực sự kết thúc chưa (dùng chung cho kill/toggle)
 static bool is_dead(const ProcessInfo& p) {
-  if (p.state == ProcessState::FINISHED) return true;
   bool rootExited = WaitForSingleObject(p.hProcess, 0) == WAIT_OBJECT_0;
   return rootExited && !job_still_active(p.hJob);
-}
-
-// Dọn dẹp entry rác (những tiến trình đã báo cáo Exited) khỏi danh sách
-static void clean_exited_processes() {
-  background_processes.erase(
-      std::remove_if(background_processes.begin(), background_processes.end(),
-                     [](const ProcessInfo& p) {
-                       return p.state == ProcessState::FINISHED;
-                     }),
-      background_processes.end());
 }
 
 // Trợ giúp suspend/resume tất cả tiến trình trong một Job Object
@@ -144,9 +133,7 @@ void add_background_process(const ProcessInfo& p) {
 
 size_t get_background_process_count() {
   std::lock_guard<std::mutex> lock(mtx_background);
-  return std::count_if(
-      background_processes.begin(), background_processes.end(),
-      [](const ProcessInfo& p) { return p.state != ProcessState::FINISHED; });
+  return background_processes.size();
 }
 
 std::vector<FinishedProcess> remove_finished_processes() {
@@ -154,10 +141,6 @@ std::vector<FinishedProcess> remove_finished_processes() {
   std::lock_guard<std::mutex> lock(mtx_background);
   auto it = background_processes.begin();
   while (it != background_processes.end()) {
-    if (it->state == ProcessState::FINISHED) {
-      it = background_processes.erase(it);
-      continue;
-    }
     DWORD wr = WaitForSingleObject(it->hProcess, 0);
     if ((wr != WAIT_OBJECT_0 && wr != WAIT_FAILED) ||
         (wr == WAIT_OBJECT_0 && job_still_active(it->hJob))) {
@@ -172,8 +155,7 @@ std::vector<FinishedProcess> remove_finished_processes() {
       finished.push_back({it->pid, code});
     }
     close_handles(*it);
-    it->state = ProcessState::FINISHED;
-    ++it;
+    it = background_processes.erase(it);
   }
   return finished;
 }
@@ -182,8 +164,7 @@ std::vector<TerminateError> terminate_all_processes() {
   std::vector<TerminateError> errors;
   std::lock_guard<std::mutex> lock(mtx_background);
   for (auto& p : background_processes) {
-    if (p.state != ProcessState::FINISHED &&
-        WaitForSingleObject(p.hProcess, 0) != WAIT_OBJECT_0)
+    if (WaitForSingleObject(p.hProcess, 0) != WAIT_OBJECT_0)
       if (!(p.hJob ? TerminateJobObject(p.hJob, 0)
                    : TerminateProcess(p.hProcess, 0)))
         errors.push_back({p.pid, GetLastError()});
@@ -195,9 +176,7 @@ std::vector<TerminateError> terminate_all_processes() {
 
 std::vector<ProcessInfo> api_list_processes() {
   std::lock_guard<std::mutex> lock(mtx_background);
-  std::vector<ProcessInfo> result = background_processes;
-  clean_exited_processes();
-  return result;
+  return background_processes;
 }
 
 // =====================================================================

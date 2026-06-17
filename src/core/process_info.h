@@ -6,9 +6,8 @@
 
 // Định nghĩa các trạng thái của vòng đời một tiến trình ngầm
 enum class ProcessState {
-  RUNNING,    // Đang thực thi bình thường
-  SUSPENDED,  // Bị tạm dừng (bởi lệnh stop)
-  FINISHED    // Đã kết thúc (do tự thoát hoặc bị kill)
+  RUNNING,   // Đang thực thi bình thường
+  SUSPENDED  // Bị tạm dừng (bởi lệnh stop)
 };
 
 // Cấu trúc lưu trữ thông tin của một tiến trình ngầm

@@ -189,9 +189,8 @@ void execute_list() {
             << std::setw(12) << "Status" << "Command\n";
   int id = 1;
   for (const auto& p : processes) {
-    std::string statusStr = (p.state == ProcessState::FINISHED)  ? "Exited"
-                            : (p.state == ProcessState::RUNNING) ? "Running"
-                                                                 : "Stopped";
+    std::string statusStr =
+        (p.state == ProcessState::RUNNING) ? "Running" : "Stopped";
     std::cout << std::left << std::setw(5) << id++ << std::setw(12) << p.pid
               << std::setw(12) << statusStr << p.command << "\n";
   }
@@ -215,11 +214,8 @@ BuiltinResult execute_builtin(const std::string& cmd,
                               const std::vector<std::string>& args,
                               bool is_bg) {
   if (cmd == "exit") {
-    remove_finished_processes();
-    if (size_t c = get_background_process_count(); c > 0)
-      std::cout << "Warning: " << c
-                << " background process(es) still running. They will be "
-                   "terminated.\n";
+    // Chỉ cần trả về lệnh EXIT_SHELL. Việc dọn dẹp tiến trình nền
+    // đã được gọi âm thầm ở hàm cleanup_and_exit() trong main.
     return BuiltinResult::EXIT_SHELL;
   }
 
