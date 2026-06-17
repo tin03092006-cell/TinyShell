@@ -96,16 +96,18 @@ int main() {
     std::cout << get_prompt();
     if (!std::getline(std::cin, input)) {
       bool isEof = std::cin.eof();
-      std::cin.clear(); // Xóa mọi trạng thái lỗi ngay lập tức
-      
+      std::cin.clear();  // Xóa mọi trạng thái lỗi ngay lập tức
+
+      Sleep(50);  // Đợi thread CtrlHandler kịp set cờ (Race Condition)
+
       if (ctrl_c_pressed) {
         ctrl_c_pressed = false;
         std::cout << "\n";
-        continue; // Bỏ qua EOF ảo do ngắt luồng
+        continue;  // Bỏ qua EOF ảo do ngắt luồng
       }
-      
-      if (isEof) break; // Thoát thật nếu là Ctrl+Z
-      break; // Lỗi khác
+
+      if (isEof) break;  // Thoát thật nếu là Ctrl+Z
+      break;             // Lỗi khác
     }
     if (ctrl_c_pressed) {
       ctrl_c_pressed = false;
