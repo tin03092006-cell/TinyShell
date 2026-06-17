@@ -102,7 +102,7 @@ int main() {
 
       if (ctrl_c_pressed) {
         ctrl_c_pressed = false;
-        std::cout << "^C\n";
+        std::cout << "\n";
         // Đọc nốt phím Enter giả do CtrlHandler nhét vào để không bị in 2 lần
         // prompt
         std::string dummy;
@@ -115,7 +115,7 @@ int main() {
     }
     if (ctrl_c_pressed) {
       ctrl_c_pressed = false;
-      std::cout << "^C\n";
+      std::cout << "\n";
       continue;
     }
     if (input.empty()) continue;
