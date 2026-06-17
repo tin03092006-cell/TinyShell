@@ -95,23 +95,20 @@ int main() {
 
     std::cout << get_prompt();
     if (!std::getline(std::cin, input)) {
-      bool isEof = std::cin.eof();
+      if (std::cin.eof()) break;  // Thoát thật nếu là Ctrl+Z
+
       std::cin.clear();  // Xóa mọi trạng thái lỗi ngay lập tức
+      std::cout << "\n";
 
-      Sleep(50);  // Đợi thread CtrlHandler kịp set cờ (Race Condition)
+      // Đọc nốt phím Enter giả do CtrlHandler nhét vào để không bị in 2 lần
+      // prompt. Quá trình đọc này đóng vai trò đồng bộ hóa luồng
+      // (Synchronization) thay cho Sleep, bắt luồng chính chờ cho đến khi
+      // CtrlHandler chạy xong.
+      std::string dummy;
+      std::getline(std::cin, dummy);
 
-      if (ctrl_c_pressed) {
-        ctrl_c_pressed = false;
-        std::cout << "\n";
-        // Đọc nốt phím Enter giả do CtrlHandler nhét vào để không bị in 2 lần
-        // prompt
-        std::string dummy;
-        std::getline(std::cin, dummy);
-        continue;  // Bỏ qua EOF ảo do ngắt luồng
-      }
-
-      if (isEof) break;  // Thoát thật nếu là Ctrl+Z
-      break;             // Lỗi khác
+      ctrl_c_pressed = false;
+      continue;
     }
     if (ctrl_c_pressed) {
       ctrl_c_pressed = false;
