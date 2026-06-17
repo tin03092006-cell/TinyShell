@@ -94,7 +94,10 @@ int main() {
     }
 
     std::cout << get_prompt();
-    if (!std::getline(std::cin, input)) break;
+    if (!std::getline(std::cin, input)) {
+      if (std::cin.eof()) break; // Người dùng ấn Ctrl+Z (EOF)
+      std::cin.clear();          // Xóa trạng thái lỗi do ngắt tín hiệu (Ctrl+C)
+    }
     if (ctrl_c_pressed) {
       ctrl_c_pressed = false;
       std::cout << "\n";
