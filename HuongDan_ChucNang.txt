@@ -1,0 +1,82 @@
+HUONG DAN CHUC NANG DUC AN TINYSHELL
+
+Duoi day la chi tiet cac chuc nang cot loi cua du an:
+
+1. Cac lenh he thong co ban (System Built-ins)
+--------------------------------------------------
+- help: Hien thi danh sach va huong dan su dung cac lenh ma shell ho tro.
+- cd <duong_dan>: Thay doi thu muc lam viec hien tai. Ho tro ca duong dan tuong doi (cd ..) va tuyet doi.
+- dir: Liet ke tat ca cac tep tin va thu muc con trong thu muc lam viec hien tai (hoac thu muc duoc chi dinh).
+- date va time: Hien thi thong tin ngay va gio hien tai cua he thong.
+- exit: Thoat khoi TinyShell. Khi goi lenh nay, he thong se tu dong don dep cac tien trinh ngam dang chay truoc khi dong cua so.
+
+2. Quan ly bien moi truong (Environment Variables)
+--------------------------------------------------
+- path: In ra noi dung hien tai cua bien moi truong PATH.
+- addpath <duong_dan>: Them mot duong dan moi vao bien PATH trong phien lam viec hien tai. Tinh nang nay giup shell nhan dien duoc cac file thuc thi .exe khong nam trong cung thu muc voi no.
+
+3. Thuc thi chuong trinh ngoai tru (External Programs)
+--------------------------------------------------
+- Ban co the goi truc tiep ten cac ung dung .exe hoac cac batch file co trong may (vi du nhu ping, notepad.exe, ipconfig...) de shell yeu cau he dieu hanh thuc thi chung.
+
+4. Xu ly tien trinh chay ngam (Background Processing)
+--------------------------------------------------
+- Toan tu '&': Khi them ky hieu '&' vao cuoi dong lenh (vi du: notepad.exe &), chuong trinh do se khoi chay doc lap duoi nen (background). Shell se ngay lap tuc tra lai dau nhac de ban go lenh tiep theo ma khong phai doi chuong trinh kia dong lai.
+- list: In ra danh sach tat ca cac tien trinh chay ngam, kem theo Process ID (PID) va trang thai hien tai cua chung (Running/Stopped).
+- stop <pid>: Tam dung (Suspend) tien trinh chay ngam co PID tuong ung.
+- resume <pid>: Tiep tuc chay lai (Resume) tien trinh dang bi tam dung.
+- kill <pid>: Ket lieu cuong buc mot tien trinh chay ngam. (Viec dung Job Objects dam bao ket lieu sach se ca cac process con cua no).
+
+5. Xu ly ngat tin hieu (Ctrl+C Handling)
+--------------------------------------------------
+- Shell chan bat tin hieu Ctrl+C. Neu ban dang chay lenh (vi du: ping google.com -t), thao tac bam Ctrl+C se chi ngat chuong trinh ping do ma khong lam tat luon ca phan mem TinyShell.
+
+==================================================
+MA CHAY THU (TEST SCRIPT)
+==================================================
+
+De trai nghiem thuc te cac tinh nang, ban co the thuc hien tuan tu chuoi lenh sau ben trong giao dien cua myshell.exe:
+
+# 1. Kiem tra lenh co ban va thoi gian
+help
+date
+time
+
+# 2. Thu nghiem thu muc
+dir
+cd src
+dir
+cd ..
+
+# 3. Xem va thao tac bien moi truong
+path
+addpath C:\TestFolder
+
+# 4. Chay lenh Foreground (Ban hay thu bam Ctrl+C luc lenh nay dang chay de xem shell co thoat khong)
+ping google.com -n 10
+
+# 5. Chay lenh duoi nen (Background process)
+notepad.exe &
+calc.exe &
+
+# 6. Kiem tra cac tien trinh dang chay ngam 
+list
+
+# ==========================================
+# CAC LENH DUOI DAY YEU CAU THAY THE PID
+# Vi du: Gia su lenh 'list' o tren bao PID cua notepad.exe la 1234
+# ==========================================
+
+# 7. Thu dong bang ung dung (Ban hay thu go chu vao notepad sau khi stop xem no co nhan khong)
+stop 1234
+list
+
+# 8. Mo dong bang (Notepad se hoat dong binh thuong tro lai)
+resume 1234
+list
+
+# 9. Dong cuong buc ung dung (Notepad se tu dong bi tat di)
+kill 1234
+
+# 10. Thoat he thong (Cac chuong trinh nen con lai nhu calc.exe cung se bi don dep)
+exit

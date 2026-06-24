@@ -1,0 +1,20 @@
+help
+date
+time
+cmd.exe /c echo ----- Dang thu muc goc -----
+dir
+cmd.exe /c echo ----- Di chuyen vao thu muc demo_folder -----
+cd demo_folder
+dir
+cmd.exe /c echo ----- Chay ung dung va mo kem file rac -----
+notepad.exe hello.txt &
+cmd.exe /c echo ----- Chay script bat gia lap chay ngam -----
+dummy_task.bat &
+cd ..
+cmd.exe /c echo ----- Kiem tra bien moi truong -----
+path
+addpath C:\Windows\System32
+cmd.exe /c echo ----- Danh sach cac chuong trinh dang chay ngam -----
+list
+ping 127.0.0.1 -n 4 > NUL
+exit
