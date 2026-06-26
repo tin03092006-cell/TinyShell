@@ -71,7 +71,7 @@ ExecutionResult execute_external(std::vector<std::string>& args,
       (is_background ? CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW : 0);
 
   auto try_create = [&](std::string cmd) {
-    return CreateProcessA(NULL, cmd.data(), NULL, NULL, FALSE, flags, NULL,
+    return CreateProcessA(NULL, &cmd[0], NULL, NULL, FALSE, flags, NULL,
                           NULL, &si, &pi) != 0;
   };
 
