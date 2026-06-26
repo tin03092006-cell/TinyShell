@@ -75,9 +75,24 @@ ExecutionResult execute_external(std::vector<std::string>& args,
                           NULL, &si, &pi) != 0;
   };
 
-  if (!try_create(cmd_line) &&
-      !try_create("cmd.exe /s /c \"" + cmd_line + "\"")) {
-    return {false, 0};
+  bool needs_cmd = false;
+  for (const auto& arg : args) {
+    if (arg.find('>') != std::string::npos || arg.find('<') != std::string::npos || arg.find('|') != std::string::npos) {
+      needs_cmd = true;
+      break;
+    }
+  }
+
+  if (needs_cmd) {
+    std::string raw_cmd = join_args(args, 0);
+    if (!try_create("cmd.exe /s /c \"" + raw_cmd + "\"")) {
+      return {false, 0};
+    }
+  } else {
+    if (!try_create(cmd_line) &&
+        !try_create("cmd.exe /s /c \"" + cmd_line + "\"")) {
+      return {false, 0};
+    }
   }
 
   // Tạo Job Object cho cả foreground và background để quản lý toàn bộ process

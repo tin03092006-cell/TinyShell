@@ -16,12 +16,16 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   if (fdwCtrlType == CTRL_BREAK_EVENT) return TRUE;
   if (fdwCtrlType != CTRL_C_EVENT) return FALSE;
 
+  ctrl_c_pressed.store(true, std::memory_order_seq_cst);
+
   // Nếu đang có foreground process, để Windows tự gửi Ctrl+C cho nó
   if (has_foreground_process()) return TRUE;
 
-  // Set flag để vòng lặp đọc phím thấy được sự kiện ngắt
-  ctrl_c_pressed.store(true, std::memory_order_seq_cst);
   return TRUE;
+}
+
+bool check_and_reset_ctrl_c() {
+  return ctrl_c_pressed.exchange(false, std::memory_order_seq_cst);
 }
 
 void setup_environment() {
